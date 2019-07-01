@@ -18,12 +18,14 @@ namespace returngis.function
         static ILogger trace;
 
         [FunctionName("Mp3ToWav")]
-        public async static void Run([BlobTrigger("mp3s/{name}", Connection = "AzureWebJobsStorage")]Stream myBlob, string name, ILogger log)
+        public async static void Run([BlobTrigger("audio/{name}", Connection = "AzureWebJobsStorage")]Stream myBlob, string name, ILogger log)
         {
             trace = log;
             trace.LogInformation($"Mp3ToWav function processed blob\n Name:{name} \n Size: {myBlob.Length} Bytes");
 
-            var mp3Temp = string.Format("{0}.mp3", Path.GetTempFileName());
+            int dotPos = name.LastIndexOf('.');
+            string sourceExt = name.Substring(dotPos + 1);
+            var mp3Temp = string.Format("{0}." + sourceExt, Path.GetTempFileName());
             var wavTemp = string.Format("{0}.wav", Path.GetTempFileName());
 
             using (var ms = new MemoryStream())
@@ -72,7 +74,7 @@ namespace returngis.function
             var container = client.GetContainerReference("wavs");
             await container.CreateIfNotExistsAsync();
 
-            var blob = container.GetBlockBlobReference(name.Replace("mp3", "wav"));
+            var blob = container.GetBlockBlobReference(name.Replace(sourceExt, "wav"));
             blob.Properties.ContentType = "audio/wav";
 
             var progressHandler = new Progress<StorageProgress>();
@@ -94,8 +96,15 @@ namespace returngis.function
 
 
             //Delete temp files
-            File.Delete(mp3Temp);
-            File.Delete(wavTemp);
+            try
+            {
+                File.Delete(mp3Temp);
+                File.Delete(wavTemp);
+            }
+            catch (Exception ex)
+            {
+                trace.LogInformation($"Error: {ex.Message}");
+            }
 
             trace.LogInformation("Done!");
         }

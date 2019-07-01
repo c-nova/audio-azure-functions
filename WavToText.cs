@@ -55,7 +55,7 @@ namespace returngis.function
                         if (e.Result.Reason == ResultReason.RecognizedSpeech)
                         {
                             log.LogInformation($"RECOGNIZED: Text={e.Result.Text}");
-                            transcript.Append($" {e.Result.Text} ");
+                            transcript.Append($"{e.Result.Text}" + Environment.NewLine);
                         }
                         else if (e.Result.Reason == ResultReason.NoMatch)
                         {
@@ -113,8 +113,20 @@ namespace returngis.function
                     File.WriteAllText(transcriptTempFile, transcript.ToString());
                     await blob.UploadFromFileAsync(transcriptTempFile);
 
-                    File.Delete(transcriptTempFile);
-                    File.Delete(temp);
+                    var containerWav = client.GetContainerReference("transcripts");
+                    var wavBlob = containerWav.GetBlockBlobReference(name);
+
+                    try
+                    {
+                        wavBlob.DeleteIfExistsAsync();
+                        File.Delete(transcriptTempFile);
+                        File.Delete(temp);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.LogInformation($"Error: {ex.Message}");
+                    }
+
                 }
             }
         }
